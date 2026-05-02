@@ -9,6 +9,7 @@ module vga_out (
     input  wire       btn_min_down,
     input  wire       sw_mode,
     input  wire       alarm_en,
+    input  wire       bg_sel,
     output wire       vga_hs,
     output wire       vga_vs,
     output wire [3:0] vga_r,
@@ -16,7 +17,8 @@ module vga_out (
     output wire [3:0] vga_b,
     output wire [7:0] seg,
     output wire [7:0] an,
-    output wire [3:0] led
+    output wire [3:0] led,
+    inout  wire       aud_pwm
 );
     wire [9:0] pixel_x;
     wire [9:0] pixel_y;
@@ -37,6 +39,7 @@ module vga_out (
     wire [3:0] bg_r;
     wire [3:0] bg_g;
     wire [3:0] bg_b;
+    wire       aud_pwm_low;
     reg [24:0] pix_cnt;
     reg [5:0]  frame_cnt;
     
@@ -65,6 +68,14 @@ module vga_out (
     assign led[1] = led_alarm;
     assign led[2] = pix_cnt[24];
     assign led[3] = frame_cnt[5];
+    assign aud_pwm = aud_pwm_low ? 1'b0 : 1'bz;
+
+    alarm_audio u_alarm_audio (
+        .clk          (pix_clk),
+        .rst          (vga_rst),
+        .alarm_active (led_alarm),
+        .pwm_low      (aud_pwm_low)
+    );
 
     clock_core u_clock_core (
         .clk          (pix_clk),
@@ -111,6 +122,7 @@ module vga_out (
     bram_background u_bram_background (
         .clk      (pix_clk),
         .video_on (video_on),
+        .bg_sel   (bg_sel),
         .pixel_x  (pixel_x),
         .pixel_y  (pixel_y),
         .bg_r     (bg_r),
@@ -119,9 +131,13 @@ module vga_out (
     );
 
     anim_gen u_anim_gen (
+        .clk        (pix_clk),
         .video_on   (video_on),
         .pixel_x    (pixel_x),
         .pixel_y    (pixel_y),
+        .sw_mode    (sw_mode),
+        .alarm_en   (alarm_en),
+        .alarm_active(led_alarm),
         .hour       (disp_hour),
         .min        (disp_min),
         .sec        (disp_sec),

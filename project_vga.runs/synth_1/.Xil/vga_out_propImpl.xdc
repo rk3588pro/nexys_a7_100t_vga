@@ -88,3 +88,7 @@ set_property src_info {type:XDC file:2 line:64 export:INPUT save:INPUT read:READ
 set_property PACKAGE_PIN P17 [get_ports btn_min_up]
 set_property src_info {type:XDC file:2 line:65 export:INPUT save:INPUT read:READ} [current_design]
 set_property PACKAGE_PIN U11 [get_ports sw_mode]
+set_property src_info {type:XDC file:2 line:89 export:INPUT save:INPUT read:READ} [current_design]
+set_property PACKAGE_PIN U12 [get_ports bg_sel]
+set_property src_info {type:XDC file:2 line:92 export:INPUT save:INPUT read:READ} [current_design]
+set_property PACKAGE_PIN A11 [get_ports aud_pwm]

@@ -19,6 +19,7 @@ module clock_core (
     output reg        led_alarm,
     output reg        one_hz_tick
 );
+    
     localparam CLK_HZ = 25_174_010;
 
     reg [24:0] tick_cnt;
@@ -34,12 +35,16 @@ module clock_core (
     wire mode;
     wire alarm_enabled;
 
+    // 两级同步处理异步输入信号
     assign mode = mode_sync[1];
     assign alarm_enabled = alarm_en_sync[1];
+
+    // 根据当前模式选择显示的时间：1为闹钟，0为正常时钟
     assign disp_hour = mode ? alarm_hour : hour;
     assign disp_min  = mode ? alarm_min  : min;
     assign disp_sec  = mode ? 6'd0       : sec;
 
+    // 实例化按键消抖及脉冲生成模块
     button_pulse u_btn_hour_up (
         .clk       (clk),
         .rst       (rst),
@@ -83,9 +88,11 @@ module clock_core (
             one_hz_tick <= 1'b0;
         end else begin
             one_hz_tick <= 1'b0;
+            // 开关信号的同步处理
             mode_sync <= {mode_sync[0], sw_mode};
             alarm_en_sync <= {alarm_en_sync[0], alarm_en};
 
+            // 1Hz 脉冲产生及自然计时进位逻辑
             if (tick_cnt == CLK_HZ - 1) begin
                 tick_cnt    <= 25'd0;
                 one_hz_tick <= 1'b1;
@@ -109,7 +116,9 @@ module clock_core (
                 tick_cnt <= tick_cnt + 25'd1;
             end
 
+            // 按键手动时间调整逻辑
             if (mode) begin
+                // 闹钟模式下的时间设定
                 if (hour_up_pulse) begin
                     alarm_hour <= (alarm_hour == 5'd23) ? 5'd0 : alarm_hour + 5'd1;
                 end else if (hour_down_pulse) begin
@@ -122,6 +131,7 @@ module clock_core (
                     alarm_min <= (alarm_min == 6'd0) ? 6'd59 : alarm_min - 6'd1;
                 end
             end else begin
+                // 正常时钟模式下的时间设定
                 if (hour_up_pulse) begin
                     hour <= (hour == 5'd23) ? 5'd0 : hour + 5'd1;
                     sec  <= 6'd0;
@@ -139,6 +149,7 @@ module clock_core (
                 end
             end
 
+            // 指示灯逻辑：整点报时以及闹钟触发
             led_hourly <= (min == 6'd0) && (sec == 6'd0);
             led_alarm  <= alarm_enabled && (hour == alarm_hour) && (min == alarm_min);
         end

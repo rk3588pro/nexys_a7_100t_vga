@@ -85,3 +85,9 @@ set_property IOSTANDARD LVCMOS33 [get_ports {an[3]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {an[2]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {an[1]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {an[0]}]
+
+set_property PACKAGE_PIN U12 [get_ports bg_sel]
+set_property IOSTANDARD LVCMOS33 [get_ports bg_sel]
+
+set_property PACKAGE_PIN A11 [get_ports aud_pwm]
+set_property IOSTANDARD LVCMOS33 [get_ports aud_pwm]

@@ -18,8 +18,9 @@ proc create_report { reportName command } {
   }
 }
 set_param chipscope.maxJobs 4
-set_param synth.incrementalSynthesisCache C:/Users/asus/AppData/Roaming/Xilinx/Vivado/.Xil/Vivado-10360-LAPTOP-A50L20VJ/incrSyn
+set_param synth.incrementalSynthesisCache C:/Users/asus/AppData/Roaming/Xilinx/Vivado/.Xil/Vivado-13632-LAPTOP-A50L20VJ/incrSyn
 set_param xicom.use_bs_reader 1
+set_msg_config -id {Common 17-41} -limit 10000000
 set_msg_config -id {Synth 8-256} -limit 10000
 set_msg_config -id {Synth 8-638} -limit 10000
 create_project -in_memory -part xc7a100tcsg324-3
@@ -35,18 +36,21 @@ set_property default_lib xil_defaultlib [current_project]
 set_property target_language Verilog [current_project]
 set_property ip_output_repo f:/vivado_project/project_vga/project_vga.cache/ip [current_project]
 set_property ip_cache_permissions {read write} [current_project]
-add_files f:/vivado_project/project_vga/project_vga.srcs/sources_1/ip/picture_12bit.coe
+add_files F:/vivado_project/project_vga/project_vga.srcs/sources_1/ip/picture_12bit.coe
+add_files F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/multi_picture_12bit.coe
 read_mem F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/background_4bit.mem
 read_verilog -library xil_defaultlib {
+  F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/alarm_audio.v
   F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/anim_gen.v
   F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/bram_background.v
   F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/button_pulse.v
   F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/clock_core.v
+  F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/font_rom.v
   F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/seg_display.v
   F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/vga_timing.v
   F:/vivado_project/project_vga/project_vga.srcs/sources_1/new/vga_out.v
 }
-read_ip -quiet f:/vivado_project/project_vga/project_vga.srcs/sources_1/ip/blk_mem_gen_0/blk_mem_gen_0.xci
+read_ip -quiet F:/vivado_project/project_vga/project_vga.srcs/sources_1/ip/blk_mem_gen_0/blk_mem_gen_0.xci
 set_property used_in_implementation false [get_files -all f:/vivado_project/project_vga/project_vga.srcs/sources_1/ip/blk_mem_gen_0/blk_mem_gen_0_ooc.xdc]
 
 read_ip -quiet F:/vivado_project/project_vga/project_vga.srcs/sources_1/ip/clk_wiz_0/clk_wiz_0.xci

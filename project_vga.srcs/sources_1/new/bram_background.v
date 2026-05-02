@@ -3,6 +3,7 @@
 module bram_background (
     input  wire       clk,
     input  wire       video_on,
+    input  wire       bg_sel,
     input  wire [9:0] pixel_x,
     input  wire [9:0] pixel_y,
     output reg  [3:0] bg_r,
@@ -11,14 +12,16 @@ module bram_background (
 );
     wire [8:0] rom_x;
     wire [7:0] rom_y;
-    wire [16:0] rom_addr;
+    wire [16:0] base_addr;
+    wire [17:0] rom_addr;
     wire [11:0] rom_rgb;
 
     reg video_on_d;
 
     assign rom_x = pixel_x[9:1];
     assign rom_y = pixel_y[8:1];
-    assign rom_addr = ({9'd0, rom_y} << 8) + ({9'd0, rom_y} << 6) + {8'd0, rom_x};
+    assign base_addr = ({9'd0, rom_y} << 8) + ({9'd0, rom_y} << 6) + {8'd0, rom_x};
+    assign rom_addr = bg_sel ? ({1'b0, base_addr} + 18'd76800) : {1'b0, base_addr};
 
     blk_mem_gen_0 u_bg_rom (
         .clka  (clk),

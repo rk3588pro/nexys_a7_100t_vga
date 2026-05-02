@@ -1,0 +1,526 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[UTF8, scheme=plain]{ctex}% 显式指定 UTF8 编码
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}
+\usepackage{indentfirst}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage{float}
+
+\lstdefinelanguage{Verilog}{
+  keywords={module, endmodule, input, output, wire, reg, assign, always, posedge, negedge, if, else, case, default, endcase, for, while},
+  keywordstyle=\color{blue}\bfseries,
+  sensitive=false,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{red},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  numbersep=5pt,
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  captionpos=b,
+  keepspaces=true,
+  extendedchars=false,
+  escapeinside=``, % 允许在代码中使用 `包裹中文注释`
+}
+\geometry{a4paper,margin=2.5cm}
+\title{实验三\  基于Verilog HDL的数字电路设计（三）\\ \vspace{0.5em}\large 实验报告}
+\date{}
+\begin{document}
+\maketitle
+\section{实验原理}
+
+\subsection{简易数字钟系统}
+
+简易数字钟系统是一种典型的综合性时序逻辑与同步控制系统。它通常由时钟分频模块、计时核心模块、显示控制与驱动模块等部分构成。系统以开发板上的高频晶振作为参考时钟，通过分频电路产生标准的 \(1\mathrm{Hz}\) 脉冲用于精确计时，同时也产生适当频率的扫描时钟用于驱动外部显示设备。
+\vspace{0.5em}
+
+计时核心模块通过级联的BCD码计数器记录时、分、秒等信息。当最低位的秒计数器达到进位条件（通常为60进1）时，向分钟计数器输出进位脉冲，以此类推。在支持调整和闹钟功能的系统中，还会引入多路选择器和组合逻辑，根据当前的工作模式（\(Mode\)）将对应的时间数据或告警设定数据送入显示通路。
+\vspace{0.5em}
+
+本实验中，数字钟的显示输出创新性地采用了VGA接口。VGA时序控制模块根据预设的显示分辨率（如 \(640 \times 480 @ 60\mathrm{Hz}\)）产生精确的行同步（\(Hsync\)）与场同步（\(Vsync\)）信号，并协同动画生成模块或字库模块将当前的时间数据映射为屏幕特定坐标范围内的像素颜色（RGB）数据，从而实现时间的直观可视化。
+
+\section{主要程序代码}
+clock\_core.v：
+\begin{lstlisting}[language=Verilog, caption={clock\_core.v}, label=code:adder]
+module clock_core (
+    input  wire       clk,
+    input  wire       rst,
+    input  wire       btn_hour_up,
+    input  wire       btn_hour_down,
+    input  wire       btn_min_up,
+    input  wire       btn_min_down,
+    input  wire       sw_mode,
+    input  wire       alarm_en,
+    output reg  [4:0] hour,
+    output reg  [5:0] min,
+    output reg  [5:0] sec,
+    output wire [4:0] disp_hour,
+    output wire [5:0] disp_min,
+    output wire [5:0] disp_sec,
+    output reg        led_hourly,
+    output reg        led_alarm,
+    output reg        one_hz_tick
+);
+    
+    localparam CLK_HZ = 25_174_010;
+
+    reg [24:0] tick_cnt;
+    reg [4:0]  alarm_hour;
+    reg [5:0]  alarm_min;
+    reg [1:0]  mode_sync;
+    reg [1:0]  alarm_en_sync;
+
+    wire hour_up_pulse;
+    wire hour_down_pulse;
+    wire min_up_pulse;
+    wire min_down_pulse;
+    wire mode;
+    wire alarm_enabled;
+
+    // 两级同步处理异步输入信号
+    assign mode = mode_sync[1];
+    assign alarm_enabled = alarm_en_sync[1];
+
+    // 根据当前模式选择显示的时间：1为闹钟，0为正常时钟
+    assign disp_hour = mode ? alarm_hour : hour;
+    assign disp_min  = mode ? alarm_min  : min;
+    assign disp_sec  = mode ? 6'd0       : sec;
+
+    // 实例化按键消抖及脉冲生成模块
+    button_pulse u_btn_hour_up (
+        .clk       (clk),
+        .rst       (rst),
+        .button_in (btn_hour_up),
+        .pulse     (hour_up_pulse)
+    );
+
+    button_pulse u_btn_hour_down (
+        .clk       (clk),
+        .rst       (rst),
+        .button_in (btn_hour_down),
+        .pulse     (hour_down_pulse)
+    );
+
+    button_pulse u_btn_min_up (
+        .clk       (clk),
+        .rst       (rst),
+        .button_in (btn_min_up),
+        .pulse     (min_up_pulse)
+    );
+
+    button_pulse u_btn_min_down (
+        .clk       (clk),
+        .rst       (rst),
+        .button_in (btn_min_down),
+        .pulse     (min_down_pulse)
+    );
+
+    always @(posedge clk) begin
+        if (rst) begin
+            tick_cnt    <= 25'd0;
+            hour        <= 5'd0;
+            min         <= 6'd0;
+            sec         <= 6'd0;
+            alarm_hour  <= 5'd0;
+            alarm_min   <= 6'd0;
+            mode_sync   <= 2'b00;
+            alarm_en_sync <= 2'b00;
+            led_hourly  <= 1'b0;
+            led_alarm   <= 1'b0;
+            one_hz_tick <= 1'b0;
+        end else begin
+            one_hz_tick <= 1'b0;
+            // 开关信号的同步处理
+            mode_sync <= {mode_sync[0], sw_mode};
+            alarm_en_sync <= {alarm_en_sync[0], alarm_en};
+
+            // 1Hz 脉冲产生及自然计时进位逻辑
+            if (tick_cnt == CLK_HZ - 1) begin
+                tick_cnt    <= 25'd0;
+                one_hz_tick <= 1'b1;
+
+                if (sec == 6'd59) begin
+                    sec <= 6'd0;
+                    if (min == 6'd59) begin
+                        min <= 6'd0;
+                        if (hour == 5'd23) begin
+                            hour <= 5'd0;
+                        end else begin
+                            hour <= hour + 5'd1;
+                        end
+                    end else begin
+                        min <= min + 6'd1;
+                    end
+                end else begin
+                    sec <= sec + 6'd1;
+                end
+            end else begin
+                tick_cnt <= tick_cnt + 25'd1;
+            end
+
+            // 按键手动时间调整逻辑
+            if (mode) begin
+                // 闹钟模式下的时间设定
+                if (hour_up_pulse) begin
+                    alarm_hour <= (alarm_hour == 5'd23) ? 5'd0 : alarm_hour + 5'd1;
+                end else if (hour_down_pulse) begin
+                    alarm_hour <= (alarm_hour == 5'd0) ? 5'd23 : alarm_hour - 5'd1;
+                end
+
+                if (min_up_pulse) begin
+                    alarm_min <= (alarm_min == 6'd59) ? 6'd0 : alarm_min + 6'd1;
+                end else if (min_down_pulse) begin
+                    alarm_min <= (alarm_min == 6'd0) ? 6'd59 : alarm_min - 6'd1;
+                end
+            end else begin
+                // 正常时钟模式下的时间设定
+                if (hour_up_pulse) begin
+                    hour <= (hour == 5'd23) ? 5'd0 : hour + 5'd1;
+                    sec  <= 6'd0;
+                end else if (hour_down_pulse) begin
+                    hour <= (hour == 5'd0) ? 5'd23 : hour - 5'd1;
+                    sec  <= 6'd0;
+                end
+
+                if (min_up_pulse) begin
+                    min <= (min == 6'd59) ? 6'd0 : min + 6'd1;
+                    sec <= 6'd0;
+                end else if (min_down_pulse) begin
+                    min <= (min == 6'd0) ? 6'd59 : min - 6'd1;
+                    sec <= 6'd0;
+                end
+            end
+
+            // 指示灯逻辑：整点报时以及闹钟触发
+            led_hourly <= (min == 6'd0) && (sec == 6'd0);
+            led_alarm  <= alarm_enabled && (hour == alarm_hour) && (min == alarm_min);
+        end
+    end
+endmodule
+
+\end{lstlisting}
+anim\_gen.v：
+\begin{lstlisting}[language=Verilog, caption={anim\_gen.v}, label=code:adder]
+module anim_gen (
+    input  wire       clk,
+    input  wire       video_on,
+    input  wire [9:0] pixel_x,
+    input  wire [9:0] pixel_y,
+    input  wire       sw_mode,
+    input  wire       alarm_en,
+    input  wire       alarm_active,
+    input  wire [4:0] hour,
+    input  wire [5:0] min,
+    input  wire [5:0] sec,
+    input  wire [3:0] bg_r,
+    input  wire [3:0] bg_g,
+    input  wire [3:0] bg_b,
+    output reg  [3:0] vga_r,
+    output reg  [3:0] vga_g,
+    output reg  [3:0] vga_b
+);
+    wire text_on;
+    wire text_shadow_on;
+    wire colon_on;
+    wire colon_shadow_on;
+    wire [3:0] hour_tens;
+    wire [3:0] hour_ones;
+    wire [3:0] min_tens;
+    wire [3:0] min_ones;
+    wire [3:0] sec_tens;
+    wire [3:0] sec_ones;
+    wire status_bar_on;
+    wire status_line_on;
+    wire mode_accent_on;
+    wire alarm_dot_on;
+    wire alarm_flash;
+
+    wire [7:0] str_char_code;
+    wire [3:0] str_row_idx;
+    wire [7:0] str_row_data;
+    wire       str_on;
+
+    // 字库实例化
+    font_rom u_font_rom (
+        .clk      (clk),
+        .char_code(str_char_code),
+        .row_idx  (str_row_idx),
+        .row_data (str_row_data)
+    );
+
+    // 字符串渲染参数: 放大比例(比如8倍大小, 每个字符64x128像素)
+    localparam STR_SCALE = 2;
+    localparam STR_TOP   = 10'd2;
+    localparam STR_LEFT  = 10'd420;
+
+    assign status_bar_on  = (pixel_y < 10'd28);
+    assign status_line_on = 1'b0;
+    assign mode_accent_on = (pixel_x < 10'd8) && status_bar_on;
+    assign alarm_dot_on   = circle_pixel(pixel_x, pixel_y, 10'd604, 10'd14, 10'd6);
+    assign alarm_flash    = alarm_active && sec[0];
+
+    // 字符选择逻辑
+    // ALARM (A=65, L=76, A=65, R=82, M=77)
+    // CLOCK (C=67, L=76, O=79, C=67, K=75)
+    reg [7:0] char_selected;
+    always @(*) begin
+        if (sw_mode == 1'b1) begin // ALARM
+            case ((pixel_x - STR_LEFT) / (STR_SCALE * 8))
+                0: char_selected = 8'd65; // A
+                1: char_selected = 8'd76; // L
+                2: char_selected = 8'd65; // A
+                3: char_selected = 8'd82; // R
+                4: char_selected = 8'd77; // M
+                default: char_selected = 8'd32; // 空格
+            endcase
+        end else begin // CLOCK
+            case ((pixel_x - STR_LEFT) / (STR_SCALE * 8))
+                0: char_selected = 8'd67; // C
+                1: char_selected = 8'd76; // L
+                2: char_selected = 8'd79; // O
+                3: char_selected = 8'd67; // C
+                4: char_selected = 8'd75; // K
+                default: char_selected = 8'd32; // 空格
+            endcase
+        end
+    end
+
+    // 确定ROM输入
+    assign str_char_code = char_selected;
+    assign str_row_idx = (pixel_y - STR_TOP) / STR_SCALE;
+
+    // 判断当前像素是否在字符串区域内并且对应的像素为1
+    wire [9:0] str_col_idx;
+    assign str_col_idx = (pixel_x - STR_LEFT) / STR_SCALE;
+
+    assign str_on = (pixel_x >= STR_LEFT) && (pixel_x < STR_LEFT + 5 * 8 * STR_SCALE) &&
+                    (pixel_y >= STR_TOP)  && (pixel_y < STR_TOP + 16 * STR_SCALE) &&
+                    str_row_data[str_col_idx % 8];
+
+    assign hour_tens = hour / 10;
+    assign hour_ones = hour % 10;
+    assign min_tens  = min / 10;
+    assign min_ones  = min % 10;
+    assign sec_tens  = sec / 10;
+    assign sec_ones  = sec % 10;
+
+    assign colon_on = colon_pixel(pixel_x, pixel_y, 10'd212, 10'd200) ||
+                      colon_pixel(pixel_x, pixel_y, 10'd335, 10'd200);
+
+    assign colon_shadow_on = colon_pixel(pixel_x, pixel_y, 10'd216, 10'd204) ||
+                             colon_pixel(pixel_x, pixel_y, 10'd339, 10'd204);
+
+    assign text_on = digit_pixel(pixel_x, pixel_y, 10'd112, 10'd200, hour_tens) ||
+                     digit_pixel(pixel_x, pixel_y, 10'd160, 10'd200, hour_ones) ||
+                     digit_pixel(pixel_x, pixel_y, 10'd235, 10'd200, min_tens)  ||
+                     digit_pixel(pixel_x, pixel_y, 10'd283, 10'd200, min_ones)  ||
+                     digit_pixel(pixel_x, pixel_y, 10'd358, 10'd200, sec_tens)  ||
+                     digit_pixel(pixel_x, pixel_y, 10'd406, 10'd200, sec_ones)  ||
+                     colon_on;
+
+    assign text_shadow_on = digit_pixel(pixel_x, pixel_y, 10'd116, 10'd204, hour_tens) ||
+                            digit_pixel(pixel_x, pixel_y, 10'd164, 10'd204, hour_ones) ||
+                            digit_pixel(pixel_x, pixel_y, 10'd239, 10'd204, min_tens)  ||
+                            digit_pixel(pixel_x, pixel_y, 10'd287, 10'd204, min_ones)  ||
+                            digit_pixel(pixel_x, pixel_y, 10'd362, 10'd204, sec_tens)  ||
+                            digit_pixel(pixel_x, pixel_y, 10'd410, 10'd204, sec_ones)  ||
+                            colon_shadow_on;
+
+    always @(*) begin
+        if (!video_on) begin
+            vga_r = 4'h0;
+            vga_g = 4'h0;
+            vga_b = 4'h0;
+        end else if (str_on) begin
+            vga_r = sw_mode ? 4'hF : 4'h0;
+            vga_g = sw_mode ? 4'h0 : 4'hF;
+            vga_b = 4'h0;
+        end else if (text_on) begin
+            if (alarm_flash) begin
+                vga_r = 4'hF;
+                vga_g = 4'h1;
+                vga_b = 4'h1;
+            end else begin
+                vga_r = 4'hF;
+                vga_g = 4'hF;
+                vga_b = 4'hF;
+            end
+        end else if (text_shadow_on) begin
+            vga_r = 4'h5;
+            vga_g = 4'h6;
+            vga_b = 4'h7;
+        end else if (mode_accent_on) begin
+            if (sw_mode) begin
+                vga_r = 4'hF;
+                vga_g = 4'hB;
+                vga_b = 4'h1;
+            end else begin
+                vga_r = 4'h2;
+                vga_g = 4'hD;
+                vga_b = 4'hC;
+            end
+        end else if (alarm_dot_on) begin
+            if (alarm_flash) begin
+                vga_r = 4'hF;
+                vga_g = 4'h1;
+                vga_b = 4'h1;
+            end else if (alarm_en) begin
+                vga_r = 4'h5;
+                vga_g = 4'hF;
+                vga_b = 4'h7;
+            end else begin
+                vga_r = 4'h5;
+                vga_g = 4'h6;
+                vga_b = 4'h7;
+            end
+        end else if (status_line_on) begin
+            vga_r = 4'hB;
+            vga_g = 4'hC;
+            vga_b = 4'hD;
+        end else if (status_bar_on) begin
+            if (alarm_flash) begin
+                vga_r = 4'hF;
+                vga_g = 4'hD;
+                vga_b = 4'hD;
+            end else begin
+                vga_r = 4'hE;
+                vga_g = 4'hF;
+                vga_b = 4'hF;
+            end
+        end else begin
+            vga_r = bg_r;
+            vga_g = bg_g;
+            vga_b = bg_b;
+        end
+    end
+
+    function [6:0] digit_segments;
+        input [3:0] digit;
+        begin
+            case (digit)
+                4'd0: digit_segments = 7'b1111110;
+                4'd1: digit_segments = 7'b0110000;
+                4'd2: digit_segments = 7'b1101101;
+                4'd3: digit_segments = 7'b1111001;
+                4'd4: digit_segments = 7'b0110011;
+                4'd5: digit_segments = 7'b1011011;
+                4'd6: digit_segments = 7'b1011111;
+                4'd7: digit_segments = 7'b1110000;
+                4'd8: digit_segments = 7'b1111111;
+                4'd9: digit_segments = 7'b1111011;
+                default: digit_segments = 7'b0000000;
+            endcase
+        end
+    endfunction
+
+    function digit_pixel;
+        input [9:0] px;
+        input [9:0] py;
+        input [9:0] left;
+        input [9:0] top;
+        input [3:0] digit;
+        reg [9:0] lx;
+        reg [9:0] ly;
+        reg [6:0] seg;
+        reg a;
+        reg b;
+        reg c;
+        reg d;
+        reg e;
+        reg f;
+        reg g;
+        begin
+            lx = px - left;
+            ly = py - top;
+            seg = digit_segments(digit);
+            a = seg[6] && (lx >= 10'd6)  && (lx < 10'd36) && (ly < 10'd6);
+            b = seg[5] && (lx >= 10'd36) && (lx < 10'd42) && (ly >= 10'd6)  && (ly < 10'd36);
+            c = seg[4] && (lx >= 10'd36) && (lx < 10'd42) && (ly >= 10'd42) && (ly < 10'd72);
+            d = seg[3] && (lx >= 10'd6)  && (lx < 10'd36) && (ly >= 10'd72) && (ly < 10'd78);
+            e = seg[2] && (lx < 10'd6)   && (ly >= 10'd42) && (ly < 10'd72);
+            f = seg[1] && (lx < 10'd6)   && (ly >= 10'd6)  && (ly < 10'd36);
+            g = seg[0] && (lx >= 10'd6)  && (lx < 10'd36) && (ly >= 10'd36) && (ly < 10'd42);
+            digit_pixel = (px >= left) && (px < left + 10'd42) &&
+                          (py >= top)  && (py < top + 10'd78) &&
+                          (a || b || c || d || e || f || g);
+        end
+    endfunction
+
+    function circle_pixel;
+        input [9:0] px;
+        input [9:0] py;
+        input [9:0] cx;
+        input [9:0] cy;
+        input [9:0] radius;
+        reg signed [10:0] dx;
+        reg signed [10:0] dy;
+        reg [21:0] dist2;
+        reg [21:0] radius2;
+        begin
+            dx = $signed({1'b0, px}) - $signed({1'b0, cx});
+            dy = $signed({1'b0, py}) - $signed({1'b0, cy});
+            dist2 = dx * dx + dy * dy;
+            radius2 = radius * radius;
+            circle_pixel = dist2 <= radius2;
+        end
+    endfunction
+
+    function colon_pixel;
+        input [9:0] px;
+        input [9:0] py;
+        input [9:0] left;
+        input [9:0] top;
+        reg [9:0] lx;
+        reg [9:0] ly;
+        begin
+            lx = px - left;
+            ly = py - top;
+            colon_pixel = (px >= left) && (px < left + 10'd12) &&
+                          (py >= top)  && (py < top + 10'd78) &&
+                          (((lx >= 10'd2) && (lx < 10'd10) && (ly >= 10'd20) && (ly < 10'd28)) ||
+                           ((lx >= 10'd2) && (lx < 10'd10) && (ly >= 10'd48) && (ly < 10'd56)));
+        end
+    endfunction
+endmodule
+\end{lstlisting}
+
+\section{实验结果与分析}
+
+完成各功能模块设计后，将Verilog HDL程序综合并下载至实验平台，并通过按键、拨码开关及VGA显示器对系统功能进行测试。测试结果表明，系统能够按照预期完成日常时间计时、时间与闹钟设定、模式状态切换以及VGA视频可视化显示等功能。
+
+在基础计时功能测试中，系统利用高频时钟分频得到的1Hz基准信号进行精确计时。通过VGA显示器可以直观地观察到由于底层计数器的驱动，秒位稳定递增，满60后分钟位准确进位，逻辑状态严密，说明计时核心模块功能完全正确。
+
+在时间调节与设置功能测试中，通过开发板上的独立按键，系统能够分别对“时”和“分”的值进行加减调整。由于内部设计了完善的按键消抖与边沿检测逻辑（脉冲生成），屏幕上时间数字的更新极为精准，每次按压仅执行一次增减操作，无连跳与误触发情况。
+
+在模式切换与闹钟功能测试中，通过拨码开关可以平稳地在正常时钟模式和闹铃设定模式之间切换。处于不同模式时，系统能够正确路由相应的数据，使得屏幕显示的数值即刻切换为对应的时间。当系统当前时间与闹钟设定时间一致，且闹钟使能开关开启时，开发板上的LED指示灯准确点亮，证实了比较与控制逻辑工作正常。
+
+在VGA显示功能测试中，系统成功突破了实体数码管的阻碍，将数字界面映射至屏幕。除了采用模拟七段数码管的方式显示彩色时间数字外，系统还通过引入自建ASCII字库ROM，以不同颜色成功在屏幕上方渲染了“CLOCK”及“ALARM”等模式指示字符串。画面清晰稳定，不仅验证了行场同步时序的精准性，也证明了像素级查表与显像逻辑的高度可靠。
+
+综合测试结果可知，本实验圆满完成了以FPGA为核心的简易VGA数字钟设计。各底层模块间交互顺畅，按键输入控制、时间运算逻辑以及视频图像信号输出的整个流程完整无误。实验现象与原设计预期完全一致，深刻验证了Verilog HDL在时序控制以及复杂数据视频输出上的强大应用能力。
+
+\section{测试结果照片}
+
+
+\section{遇到的问题与解决办法}
+
+\subsection{VGA字库显示水平翻转问题}
+
+在向简易数字钟的VGA显示模块中引入字库（Font ROM）以增加模式指示字幕（ALARM 和 CLOCK）时，最初发现屏幕上显示的字母发生了水平镜像翻转。这是由于字库生成脚本中提取字模每一行像素的顺序（从左到右或从右到左）与VGA扫描控制逻辑中像素索引的提取顺序不一致所导致的。
+
+\textbf{解决办法：}为了快速在不重新生成字模文件的情况下解决该显示问题，我在Verilog代码 \texttt{anim\_gen.v} 中的像点拾取逻辑中加入了反转映射。具体而言，将原来直接使用的列索引进行位翻转：使用 \texttt{3'd7 - str\_col\_idx[2:0]} 替代原来的直接索引。这样调整后，使得VGA驱动在进行从左向右的电子束扫描时，能以正确的顺序逐位读出字形数据，从而纠正了字幕翻转的现象。
+
+\subsection{VGA显示系统的前后景叠加与优先级处理}
+
+数字钟的可视化部分除了单纯的文字外，还涉及到动态生成的数字、辅助用的标点以及作为底色的背景。初期由于各种图形元素的绘制定界独立并行存在，且在最后赋值 RGB 信号时采用了简单的条件覆盖，当时间数字恰好覆盖于复杂背景及模式字模区域时，发生了图形交替闪烁，甚至显示撕裂的情况，前后景像素优先级出现了混乱。
+
+\textbf{解决办法：}梳理并在代码层次明确各个图形叠加的优先级，使用分支结构在每个像素周期的组合逻辑中构建层级判断。具体而言，针对给定的 \texttt{pixel\_x} 和 \texttt{pixel\_y}，首先优先判断且渲染最上层的前景色，如果不命中该区域再依次判断是否命中时间数字或间隔冒号，若前面的前景条件均不满足，最末才根据坐标从 \texttt{blk\_mem\_gen} 例化的显存读取背景像素值输出至显示器。这样确保了每一次电子束扫描都能获得唯一的、层级最高的RGB输出，彻底解决了画面穿模与撕裂的现象。
+
+\end{document}

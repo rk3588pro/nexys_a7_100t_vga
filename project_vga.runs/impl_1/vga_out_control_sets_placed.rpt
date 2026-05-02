@@ -1,7 +1,7 @@
 Copyright 1986-2019 Xilinx, Inc. All Rights Reserved.
 ------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2019.2 (win64) Build 2708876 Wed Nov  6 21:40:23 MST 2019
-| Date         : Thu Apr 30 20:12:01 2026
+| Date         : Sat May  2 21:06:51 2026
 | Host         : LAPTOP-A50L20VJ running 64-bit major release  (build 9200)
 | Command      : report_control_sets -verbose -file vga_out_control_sets_placed.rpt
 | Design       : vga_out
@@ -23,11 +23,11 @@ Table of Contents
 +----------------------------------------------------------+-------+
 |                          Status                          | Count |
 +----------------------------------------------------------+-------+
-| Total control sets                                       |    14 |
-|    Minimum number of control sets                        |    14 |
+| Total control sets                                       |    18 |
+|    Minimum number of control sets                        |    18 |
 |    Addition due to synthesis replication                 |     0 |
 |    Addition due to physical synthesis replication        |     0 |
-| Unused register locations in slices containing registers |    49 |
+| Unused register locations in slices containing registers |    59 |
 +----------------------------------------------------------+-------+
 * Control sets can be merged at opt_design using control_set_merge or merge_equivalent_drivers
 ** Run report_qor_suggestions for automated merging and remapping suggestions
@@ -39,15 +39,15 @@ Table of Contents
 +--------------------+-------+
 |       Fanout       | Count |
 +--------------------+-------+
-| Total control sets |    14 |
+| Total control sets |    18 |
 | >= 0 to < 4        |     0 |
 | >= 4 to < 6        |     3 |
-| >= 6 to < 8        |     3 |
+| >= 6 to < 8        |     5 |
 | >= 8 to < 10       |     0 |
 | >= 10 to < 12      |     1 |
-| >= 12 to < 14      |     2 |
+| >= 12 to < 14      |     1 |
 | >= 14 to < 16      |     0 |
-| >= 16              |     5 |
+| >= 16              |     8 |
 +--------------------+-------+
 * Control sets can be remapped at either synth_design or opt_design
 
@@ -58,35 +58,39 @@ Table of Contents
 +--------------+-----------------------+------------------------+-----------------+--------------+
 | Clock Enable | Synchronous Set/Reset | Asynchronous Set/Reset | Total Registers | Total Slices |
 +--------------+-----------------------+------------------------+-----------------+--------------+
-| No           | No                    | No                     |              13 |            6 |
+| No           | No                    | No                     |              24 |           15 |
 | No           | No                    | Yes                    |               0 |            0 |
-| No           | Yes                   | No                     |             192 |           64 |
-| Yes          | No                    | No                     |               0 |            0 |
+| No           | Yes                   | No                     |             239 |           80 |
+| Yes          | No                    | No                     |               6 |            2 |
 | Yes          | No                    | Yes                    |               0 |            0 |
-| Yes          | Yes                   | No                     |              42 |           16 |
+| Yes          | Yes                   | No                     |              48 |           22 |
 +--------------+-----------------------+------------------------+-----------------+--------------+
 
 
 4. Detailed Control Set Information
 -----------------------------------
 
-+----------------------------+----------------------------------------------+-------------------------------------------------+------------------+----------------+
-|        Clock Signal        |                 Enable Signal                |                 Set/Reset Signal                | Slice Load Count | Bel Load Count |
-+----------------------------+----------------------------------------------+-------------------------------------------------+------------------+----------------+
-|  u_clk_wiz_0/inst/clk_out1 | u_clock_core/u_btn_min_down/tick_cnt_reg[21] | u_clock_core/u_btn_min_down/tick_cnt_reg[21]_0  |                1 |              4 |
-|  u_clk_wiz_0/inst/clk_out1 | u_clock_core/u_btn_hour_down/E[0]            | u_clock_core/u_btn_min_down/SR[0]               |                2 |              5 |
-|  u_clk_wiz_0/inst/clk_out1 | u_clock_core/u_btn_hour_up/E[0]              | u_clock_core/u_btn_min_down/SR[0]               |                1 |              5 |
-|  u_clk_wiz_0/inst/clk_out1 | u_vga_timing/E[0]                            | u_clock_core/u_btn_min_down/SR[0]               |                1 |              6 |
-|  u_clk_wiz_0/inst/clk_out1 | u_clock_core/u_btn_min_up/E[0]               | u_clock_core/u_btn_min_down/SR[0]               |                3 |              6 |
-|  u_clk_wiz_0/inst/clk_out1 | u_clock_core/u_btn_min_down/E[0]             | u_clock_core/u_btn_min_down/SR[0]               |                3 |              6 |
-|  u_clk_wiz_0/inst/clk_out1 | u_vga_timing/pixel_y[9]_i_1_n_0              | u_clock_core/u_btn_min_down/SR[0]               |                5 |             10 |
-|  u_clk_wiz_0/inst/clk_out1 |                                              | u_bram_background/bg_r[3]_i_1_n_0               |                5 |             12 |
-|  u_clk_wiz_0/inst/clk_out1 |                                              |                                                 |                6 |             13 |
-|  u_clk_wiz_0/inst/clk_out1 |                                              | u_clock_core/u_btn_min_up/cnt[18]_i_1__1_n_0    |                7 |             19 |
-|  u_clk_wiz_0/inst/clk_out1 |                                              | u_clock_core/u_btn_hour_down/cnt[18]_i_1__2_n_0 |                4 |             19 |
-|  u_clk_wiz_0/inst/clk_out1 |                                              | u_clock_core/u_btn_hour_up/cnt[18]_i_1_n_0      |                5 |             19 |
-|  u_clk_wiz_0/inst/clk_out1 |                                              | u_clock_core/u_btn_min_down/cnt[18]_i_1__0_n_0  |                5 |             19 |
-|  u_clk_wiz_0/inst/clk_out1 |                                              | u_clock_core/u_btn_min_down/SR[0]               |               38 |            104 |
-+----------------------------+----------------------------------------------+-------------------------------------------------+------------------+----------------+
++----------------------------+--------------------------------------------+-------------------------------------------------+------------------+----------------+
+|        Clock Signal        |                Enable Signal               |                 Set/Reset Signal                | Slice Load Count | Bel Load Count |
++----------------------------+--------------------------------------------+-------------------------------------------------+------------------+----------------+
+|  u_clk_wiz_0/inst/clk_out1 | u_alarm_audio/unit_idx                     | u_alarm_audio/unit_idx[3]_i_1_n_0               |                1 |              4 |
+|  u_clk_wiz_0/inst/clk_out1 | u_clock_core/u_btn_hour_down/E[0]          | u_clock_core/u_btn_min_down/SR[0]               |                2 |              5 |
+|  u_clk_wiz_0/inst/clk_out1 | u_clock_core/u_btn_hour_up/E[0]            | u_clock_core/u_btn_min_down/SR[0]               |                2 |              5 |
+|  u_clk_wiz_0/inst/clk_out1 | u_clock_core/u_btn_min_down/E[0]           |                                                 |                2 |              6 |
+|  u_clk_wiz_0/inst/clk_out1 | u_clock_core/u_btn_min_down/pulse_reg_0[0] | u_clock_core/u_btn_min_down/SR[0]               |                4 |              6 |
+|  u_clk_wiz_0/inst/clk_out1 | u_clock_core/u_btn_min_up/E[0]             | u_clock_core/u_btn_min_down/SR[0]               |                4 |              6 |
+|  u_clk_wiz_0/inst/clk_out1 | u_vga_timing/E[0]                          | u_clock_core/u_btn_min_down/SR[0]               |                1 |              6 |
+|  u_clk_wiz_0/inst/clk_out1 | u_alarm_audio/note_idx[5]_i_2_n_0          | u_clock_core/led_alarm_reg_2[0]                 |                1 |              6 |
+|  u_clk_wiz_0/inst/clk_out1 | u_vga_timing/pixel_y[9]_i_1_n_0            | u_clock_core/u_btn_min_down/SR[0]               |                7 |             10 |
+|  u_clk_wiz_0/inst/clk_out1 |                                            | u_bram_background/bg_r[3]_i_1_n_0               |                6 |             12 |
+|  u_clk_wiz_0/inst/clk_out1 |                                            | u_alarm_audio/tone_cnt[0]_i_1_n_0               |                4 |             16 |
+|  u_clk_wiz_0/inst/clk_out1 |                                            | u_clock_core/u_btn_hour_down/cnt[18]_i_1__1_n_0 |                5 |             19 |
+|  u_clk_wiz_0/inst/clk_out1 |                                            | u_clock_core/u_btn_hour_up/cnt[18]_i_1__2_n_0   |                5 |             19 |
+|  u_clk_wiz_0/inst/clk_out1 |                                            | u_clock_core/u_btn_min_down/cnt[18]_i_1_n_0     |                5 |             19 |
+|  u_clk_wiz_0/inst/clk_out1 |                                            | u_clock_core/u_btn_min_up/cnt[18]_i_1__0_n_0    |                5 |             19 |
+|  u_clk_wiz_0/inst/clk_out1 |                                            | u_clock_core/led_alarm_reg_2[0]                 |                7 |             22 |
+|  u_clk_wiz_0/inst/clk_out1 |                                            |                                                 |               15 |             24 |
+|  u_clk_wiz_0/inst/clk_out1 |                                            | u_clock_core/u_btn_min_down/SR[0]               |               43 |            113 |
++----------------------------+--------------------------------------------+-------------------------------------------------+------------------+----------------+
 
 

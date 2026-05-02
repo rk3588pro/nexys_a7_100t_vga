@@ -60,6 +60,7 @@ proc step_failed { step } {
   close $ch
 }
 
+set_msg_config -id {Common 17-41} -limit 10000000
 set_msg_config -id {Synth 8-256} -limit 10000
 set_msg_config -id {Synth 8-638} -limit 10000
 
@@ -68,7 +69,7 @@ set ACTIVE_STEP init_design
 set rc [catch {
   create_msg_db init_design.pb
   set_param chipscope.maxJobs 4
-  set_param synth.incrementalSynthesisCache C:/Users/asus/AppData/Roaming/Xilinx/Vivado/.Xil/Vivado-10360-LAPTOP-A50L20VJ/incrSyn
+  set_param synth.incrementalSynthesisCache C:/Users/asus/AppData/Roaming/Xilinx/Vivado/.Xil/Vivado-13632-LAPTOP-A50L20VJ/incrSyn
   set_param xicom.use_bs_reader 1
   create_project -in_memory -part xc7a100tcsg324-3
   set_property design_mode GateLvl [current_fileset]
@@ -79,7 +80,7 @@ set rc [catch {
   set_property ip_cache_permissions {read write} [current_project]
   set_property XPM_LIBRARIES {XPM_CDC XPM_MEMORY} [current_project]
   add_files -quiet F:/vivado_project/project_vga/project_vga.runs/synth_1/vga_out.dcp
-  read_ip -quiet f:/vivado_project/project_vga/project_vga.srcs/sources_1/ip/blk_mem_gen_0/blk_mem_gen_0.xci
+  read_ip -quiet F:/vivado_project/project_vga/project_vga.srcs/sources_1/ip/blk_mem_gen_0/blk_mem_gen_0.xci
   read_ip -quiet F:/vivado_project/project_vga/project_vga.srcs/sources_1/ip/clk_wiz_0/clk_wiz_0.xci
   read_xdc F:/vivado_project/project_vga/project_vga.srcs/constrs_1/new/VGA.xdc
   link_design -top vga_out -part xc7a100tcsg324-3
